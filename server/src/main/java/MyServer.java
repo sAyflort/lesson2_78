@@ -1,3 +1,5 @@
+import service.ServiceMessages;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -46,22 +48,12 @@ public class MyServer {
 
     public synchronized void subscribe(ClientHandler o) {
         clients.add(o);
-        StringBuilder str = new StringBuilder("/clients");
-        for (ClientHandler a: clients
-             ) {
-            str.append(" "+a.getname());
-        }
-        broadcastMsg(str.toString());
+        updateSheet();
     }
 
     public synchronized void unsubscribe(ClientHandler o) {
         clients.remove(o);
-        StringBuilder str = new StringBuilder("/clients");
-        for (ClientHandler a: clients
-        ) {
-            str.append(" "+a.getname());
-        }
-        broadcastMsg(str.toString());
+        updateSheet();
     }
 
     public synchronized void broadcastMsg(String msg) {
@@ -83,5 +75,24 @@ public class MyServer {
                 }
             }
         }
+    }
+
+    public void changeNick(ClientHandler client, String msg) {
+        if(authService.changeNick(msg.split(" ")[1], msg.split(" ")[2])) {
+            client.setName(msg.split(" ")[2]);
+            client.sendMsg("Nickname изменен.");
+        } else {
+            client.sendMsg("Неверный логин/ nickname занят");
+        }
+        updateSheet();
+    }
+
+    public void updateSheet() {
+        StringBuilder str = new StringBuilder(ServiceMessages.CLIENTS.getCommand());
+        for (ClientHandler a: clients
+        ) {
+            str.append(" "+a.getname());
+        }
+        broadcastMsg(str.toString());
     }
 }

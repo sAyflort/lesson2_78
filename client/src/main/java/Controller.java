@@ -16,6 +16,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.WindowEvent;
+import service.ServiceMessages;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -85,7 +86,7 @@ public class Controller implements Initializable{
                         System.out.println("bye");
                         if (socket != null && !socket.isClosed()) {
                             try {
-                                out.writeUTF("/end");
+                                out.writeUTF(ServiceMessages.END.getCommand());
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
@@ -112,15 +113,15 @@ public class Controller implements Initializable{
                         String str = in.readUTF();
 
                         if (str.startsWith("/")) {
-                            if (str.equals("/end")) {
+                            if (str.equals(ServiceMessages.END.getCommand())) {
                                 break;
                             }
-                            if (str.startsWith("/authok")) {
+                            if (str.startsWith(ServiceMessages.AUTHOK.getCommand())) {
                                 nickname = str.split(" ")[1];
                                 setAuthenticated(true);
                                 break;
                             }
-                            if (str.startsWith("/reg")) {
+                            if (str.startsWith(ServiceMessages.REG.getCommand())) {
                                 regController.regStatus(str);
                             }
 
@@ -134,12 +135,12 @@ public class Controller implements Initializable{
                     while (authenticated) {
                         String str = in.readUTF();
 
-                        if (str.equals("/end")) {
+                        if (str.equals(ServiceMessages.END.getCommand())) {
                             setAuthenticated(false);
                             break;
                         }
 
-                        if(str.startsWith("/clients")) {
+                        if(str.startsWith(ServiceMessages.CLIENTS.getCommand())) {
 
                             list = str.split(" ");
                             Platform.runLater(new Runnable() {
@@ -197,7 +198,7 @@ public class Controller implements Initializable{
         }
 
         try {
-            String msg = String.format("/auth %s %s",
+            String msg = String.format(ServiceMessages.AUTH.getCommand()+" %s %s",
                     loginField.getText().trim(), passwordField.getText().trim());
             out.writeUTF(msg);
             passwordField.clear();
@@ -245,7 +246,7 @@ public class Controller implements Initializable{
         if (socket == null || socket.isClosed()) {
             connect();
         }
-        String msg = String.format("/reg %s %s %s", login, password, nickname);
+        String msg = String.format(ServiceMessages.REG.getCommand()+" %s %s %s", login, password, nickname);
         try {
             out.writeUTF(msg);
         } catch (IOException e) {

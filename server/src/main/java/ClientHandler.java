@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.TimeoutException;
+import service.ServiceMessages;
 
 public class ClientHandler {
     private MyServer myServer;
@@ -16,6 +17,9 @@ public class ClientHandler {
 
     public String getname() {
         return name;
+    }
+    public void setName(String name) {
+        this.name = name;
     }
 
     public ClientHandler(MyServer myServer, final Socket socket) {
@@ -31,7 +35,7 @@ public class ClientHandler {
                 public void run() {
                     try {
                         //почему-то таймер запускается только на шаге readMsg, а во время authentication времени неограничено
-                        socket.setSoTimeout(1000);
+                        socket.setSoTimeout(120000);
                         authentication();
                         socket.setSoTimeout(0);
                         readMsg();
@@ -53,20 +57,20 @@ public class ClientHandler {
             try {
                 String str = in.readUTF();
                 if(str.startsWith("/")) {
-                    if(str.startsWith("/reg")) {
+                    if(str.startsWith(ServiceMessages.REG.getCommand())) {
                         String[] parts = str.split(" ");
                         if(myServer.getAuthService().reg(parts[1], parts[2], parts[3])) {
-                            sendMsg("/reg_ok");
+                            sendMsg(ServiceMessages.REG_OK.getCommand());
                         } else {
-                            sendMsg("/reg_not");
+                            sendMsg(ServiceMessages.REG_NOT.getCommand());
                         }
                     }
-                    if (str.startsWith("/auth")) {
+                    if (str.startsWith(ServiceMessages.AUTH.getCommand())) {
                         String[] parts = str.split(" ");
                         String nick = myServer.getAuthService().getNickByLoginPass(parts[1], parts[2]);
                         if (nick != null) {
                             if (!myServer.isNickBusy(nick)) {
-                                sendMsg("/authok " + nick);
+                                sendMsg(ServiceMessages.AUTHOK.getCommand()+" " + nick);
                                 name = nick;
                                 myServer.broadcastMsg(name + " зашел в чат");
                                 myServer.subscribe(this);
@@ -99,11 +103,13 @@ public class ClientHandler {
             while (true) {
                 String strFromServer = in.readUTF();
                 System.out.println(name+": "+strFromServer);
-                if(strFromServer.equals("/end")) {
+                if(strFromServer.equals(ServiceMessages.END.getCommand())) {
                     sendMsg(strFromServer);
                     return;
                 }
-                if(strFromServer.startsWith("/w")) {
+                if(strFromServer.startsWith(ServiceMessages.CHANGE.getCommand())) {
+                    myServer.changeNick(this, strFromServer);
+                } else if(strFromServer.startsWith("/w")) {
                     myServer.privateMsg(this, strFromServer);
                 } else {
                     myServer.broadcastMsg(name + ": " + strFromServer);
