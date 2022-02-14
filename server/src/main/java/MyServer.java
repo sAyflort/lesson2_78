@@ -1,14 +1,23 @@
+/*
+    Добавить на серверную сторону сетевого чата логирование событий
+    (сервер запущен, произошла ошибка, клиент подключился, клиент прислал сообщение/команду)
+ */
+
 import service.ServiceMessages;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 public class MyServer {
-    private final int PORT = 8189;
+    private final int PORT = 8190;
 
+    private static final Logger LOGGER = Logger.getLogger(MyServer.class.getName());
     private List<ClientHandler> clients;
     private AuthService authService;
 
@@ -18,17 +27,19 @@ public class MyServer {
 
     public MyServer() {
         try(ServerSocket server = new ServerSocket(PORT)) {
+            LogManager manager = LogManager.getLogManager();
+            manager.readConfiguration(new FileInputStream("server/src/main/resources/logging.properties"));
             authService = new BaseAuthService();
             authService.start();
             clients = new ArrayList<>();
             while (true) {
-                System.out.println("Сервер ожидает подключения");
+                LOGGER.info("Сервер ожидает подключения");
                 Socket socket = server.accept();
-                System.out.println("Клиент подключился");
+                LOGGER.info("Клиент подключился");
                 new ClientHandler(this, socket);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.warning(e.getMessage());
         } finally {
             if (authService != null) {
                 authService.stop();

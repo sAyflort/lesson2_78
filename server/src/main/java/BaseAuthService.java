@@ -1,15 +1,23 @@
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.sql.*;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 public class BaseAuthService implements AuthService{
     private Connection connection;
     private PreparedStatement prInsert, prUpdate, prSelectAuth, prSelectReg, prSelectChange;
+    private static final Logger LOGGER = Logger.getLogger(MyServer.class.getName());
 
     public BaseAuthService() {
         try {
             connect();
             prepareAllStatements();
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
+            LogManager manager = LogManager.getLogManager();
+            manager.readConfiguration(new FileInputStream("server/src/main/resources/logging.properties"));
+        } catch (SQLException | IOException throwables) {
+            LOGGER.warning(throwables.getMessage());;
         }
     }
 
@@ -43,12 +51,12 @@ public class BaseAuthService implements AuthService{
 
     @Override
     public void start() {
-        System.out.println("Сервис аутенфикации запущен");
+        LOGGER.info("Сервис аутенфикации запущен");
     }
     @Override
     public void stop() {
         disconnect();
-        System.out.println("Сервис аутенфикации остановлен");
+        LOGGER.info("Сервис аутенфикации остановлен");
     }
 
     @Override
@@ -99,7 +107,7 @@ public class BaseAuthService implements AuthService{
                 return true;
             }
         } catch (SQLException throwables) {
-            throwables.printStackTrace();
+            LOGGER.warning(throwables.getMessage());
         }
 
         return false;

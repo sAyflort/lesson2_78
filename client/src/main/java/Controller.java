@@ -47,7 +47,6 @@ public class Controller implements Initializable{
     @FXML
     private ListView clients;
 
-
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
@@ -55,7 +54,7 @@ public class Controller implements Initializable{
     public Stage regStage;
 
     private final String ADDRESS = "localhost";
-    private final int PORT = 8189;
+    private final int PORT = 8190;
 
     private boolean authenticated;
     private String nickname;
