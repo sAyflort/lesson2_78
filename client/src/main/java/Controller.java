@@ -1,3 +1,4 @@
+import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
@@ -16,15 +17,19 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.WindowEvent;
+import service.ServiceMessages;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.io.File;
+import java.io.FileWriter;
 
 public class Controller implements Initializable{
     @FXML
@@ -42,20 +47,22 @@ public class Controller implements Initializable{
     @FXML
     private ListView clients;
 
-
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
+    private FileWriter outFile;
     public Stage regStage;
 
     private final String ADDRESS = "localhost";
-    private final int PORT = 8189;
+    private final int PORT = 8190;
 
     private boolean authenticated;
     private String nickname;
+    private String login;
     private Stage stage;
     private RegController regController;
     private String[] list;
+    private FileWriter fileWriter;
 
     public void setAuthenticated(boolean authenticated) {
         this.authenticated = authenticated;
@@ -67,6 +74,7 @@ public class Controller implements Initializable{
 
         if (!authenticated) {
             nickname = "";
+            login = "";
         }
 
         setTitle(nickname);
@@ -85,7 +93,7 @@ public class Controller implements Initializable{
                         System.out.println("bye");
                         if (socket != null && !socket.isClosed()) {
                             try {
-                                out.writeUTF("/end");
+                                out.writeUTF(ServiceMessages.END.getCommand());
                             } catch (IOException e) {
                                 e.printStackTrace();
                             }
@@ -107,60 +115,8 @@ public class Controller implements Initializable{
             new Thread(new Runnable() {
                 @Override
                 public void run()  { try {
-                    //цикл аутентификации
-                    while (true) {
-                        String str = in.readUTF();
-
-                        if (str.startsWith("/")) {
-                            if (str.equals("/end")) {
-                                break;
-                            }
-                            if (str.startsWith("/authok")) {
-                                nickname = str.split(" ")[1];
-                                setAuthenticated(true);
-                                break;
-                            }
-                            if (str.startsWith("/reg")) {
-                                regController.regStatus(str);
-                            }
-
-                        } else {
-                            textArea.appendText(str + "\n");
-                        }
-                    }
-
-
-                    //цикл работы
-                    while (authenticated) {
-                        String str = in.readUTF();
-
-                        if (str.equals("/end")) {
-                            setAuthenticated(false);
-                            break;
-                        }
-
-                        if(str.startsWith("/clients")) {
-
-                            list = str.split(" ");
-                            Platform.runLater(new Runnable() {
-                                @Override
-                                public void run() {
-                                    {
-                                        clients.getItems().clear();
-                                        for (int i = 1; i < list.length; i++) {
-                                            clients.getItems().add(list[i]);
-                                        }
-                                    }
-                                }
-                            });
-
-
-                        } else {
-
-                            textArea.appendText(str + "\n");
-                        }
-                    }
-
+                    authentication();
+                    readMsg();
                 } catch (IOException e) {
                     e.printStackTrace();
                 } finally {
@@ -175,6 +131,76 @@ public class Controller implements Initializable{
             }).start();
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    public void authentication() throws IOException {
+        while (true) {
+            String str = in.readUTF();
+
+            if (str.startsWith("/")) {
+                if (str.equals(ServiceMessages.END.getCommand())) {
+                    break;
+                }
+                if (str.startsWith(ServiceMessages.AUTHOK.getCommand())) {
+                    nickname = str.split(" ")[1];
+                    setAuthenticated(true);
+                    loadHistory();
+                    break;
+                }
+                if (str.startsWith(ServiceMessages.REG.getCommand())) {
+                    regController.regStatus(str);
+                }
+
+            } else {
+                textArea.appendText(str + "\n");
+            }
+        }
+    }
+
+    private void loadHistory() throws IOException {
+        File history = new File("local_history/history_" + login + ".txt");
+        fileWriter = new FileWriter(history, true);
+        List<String> list = Files.readAllLines(Paths.get(history.toURI()));
+        int index = 0;
+        if (list.size() > 100) {
+            index = list.size() - 100;
+        }
+        for (int i = index; i < list.size(); i++) {
+            textArea.appendText(list.get(i) + "\n");
+        }
+    }
+
+    public void readMsg() throws IOException{
+        while (authenticated) {
+            String str = in.readUTF();
+
+            if (str.equals(ServiceMessages.END.getCommand())) {
+                setAuthenticated(false);
+                fileWriter.close();
+                break;
+            }
+
+            if(str.startsWith(ServiceMessages.CLIENTS.getCommand())) {
+
+                list = str.split(" ");
+                Platform.runLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        {
+                            clients.getItems().clear();
+                            for (int i = 1; i < list.length; i++) {
+                                clients.getItems().add(list[i]);
+                            }
+                        }
+                    }
+                });
+
+
+            } else {
+                fileWriter.write(str + "\n");
+                textArea.appendText(str + "\n");
+            }
         }
     }
 
@@ -197,8 +223,9 @@ public class Controller implements Initializable{
         }
 
         try {
-            String msg = String.format("/auth %s %s",
+            String msg = String.format(ServiceMessages.AUTH.getCommand()+" %s %s",
                     loginField.getText().trim(), passwordField.getText().trim());
+            this.login = loginField.getText().trim();
             out.writeUTF(msg);
             passwordField.clear();
         } catch (IOException e) {
@@ -245,7 +272,7 @@ public class Controller implements Initializable{
         if (socket == null || socket.isClosed()) {
             connect();
         }
-        String msg = String.format("/reg %s %s %s", login, password, nickname);
+        String msg = String.format(ServiceMessages.REG.getCommand()+" %s %s %s", login, password, nickname);
         try {
             out.writeUTF(msg);
         } catch (IOException e) {

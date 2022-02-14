@@ -1,0 +1,4 @@
+# Project exclude paths
+/client/${project.build.directory}/classes/
+/out/
+/server/${project.build.directory}/classes/

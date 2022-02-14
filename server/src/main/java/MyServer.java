@@ -1,12 +1,23 @@
+/*
+    Добавить на серверную сторону сетевого чата логирование событий
+    (сервер запущен, произошла ошибка, клиент подключился, клиент прислал сообщение/команду)
+ */
+
+import service.ServiceMessages;
+
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 
 public class MyServer {
-    private final int PORT = 8189;
+    private final int PORT = 8190;
 
+    private static final Logger LOGGER = Logger.getLogger(MyServer.class.getName());
     private List<ClientHandler> clients;
     private AuthService authService;
 
@@ -16,17 +27,19 @@ public class MyServer {
 
     public MyServer() {
         try(ServerSocket server = new ServerSocket(PORT)) {
+            LogManager manager = LogManager.getLogManager();
+            manager.readConfiguration(new FileInputStream("server/src/main/resources/logging.properties"));
             authService = new BaseAuthService();
             authService.start();
             clients = new ArrayList<>();
             while (true) {
-                System.out.println("Сервер ожидает подключения");
+                LOGGER.info("Сервер ожидает подключения");
                 Socket socket = server.accept();
-                System.out.println("Клиент подключился");
+                LOGGER.info("Клиент подключился");
                 new ClientHandler(this, socket);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.warning(e.getMessage());
         } finally {
             if (authService != null) {
                 authService.stop();
@@ -46,22 +59,12 @@ public class MyServer {
 
     public synchronized void subscribe(ClientHandler o) {
         clients.add(o);
-        StringBuilder str = new StringBuilder("/clients");
-        for (ClientHandler a: clients
-             ) {
-            str.append(" "+a.getname());
-        }
-        broadcastMsg(str.toString());
+        updateSheet();
     }
 
     public synchronized void unsubscribe(ClientHandler o) {
         clients.remove(o);
-        StringBuilder str = new StringBuilder("/clients");
-        for (ClientHandler a: clients
-        ) {
-            str.append(" "+a.getname());
-        }
-        broadcastMsg(str.toString());
+        updateSheet();
     }
 
     public synchronized void broadcastMsg(String msg) {
@@ -83,5 +86,24 @@ public class MyServer {
                 }
             }
         }
+    }
+
+    public void changeNick(ClientHandler client, String msg) {
+        if(authService.changeNick(msg.split(" ")[1], msg.split(" ")[2])) {
+            client.setName(msg.split(" ")[2]);
+            client.sendMsg("Nickname изменен.");
+        } else {
+            client.sendMsg("Неверный логин/ nickname занят");
+        }
+        updateSheet();
+    }
+
+    public void updateSheet() {
+        StringBuilder str = new StringBuilder(ServiceMessages.CLIENTS.getCommand());
+        for (ClientHandler a: clients
+        ) {
+            str.append(" "+a.getname());
+        }
+        broadcastMsg(str.toString());
     }
 }
